@@ -37,7 +37,7 @@ from rich.theme import Theme
 from rich import box
 
 # --- Configuration ---
-APP_VERSION = "2.1.3"
+APP_VERSION = "2.1.4"
 
 # Default ignore lists
 IGNORE_EXTENSIONS = {".pyc", ".pyo", ".pyd", ".DS_Store", "Thumbs.db"}
@@ -160,6 +160,10 @@ LANG = CONFIG.get("language", "en")
 
 def load_translations():
     try:
+        # Load defaults first (Source of Truth)
+        default_content = importlib.resources.files("txa_mediafire").joinpath("translations.json").read_text(encoding="utf-8")
+        translations = json.loads(default_content)
+
         config_path = get_config_path()
         config_dir = path.dirname(config_path)
         trans_path = path.join(config_dir, "translations.json")
@@ -169,28 +173,31 @@ def load_translations():
             makedirs(config_dir, exist_ok=True)
         except: pass
 
-        # Always try to extract default translations if missing
-        if not path.exists(trans_path):
+        # Load user file if exists and merge
+        if path.exists(trans_path):
             try:
-                default_content = importlib.resources.files("txa_mediafire").joinpath("translations.json").read_text(encoding="utf-8")
+                with open(trans_path, "r", encoding="utf-8") as f:
+                    user_trans = json.load(f)
+                    # Merge user overrides into defaults
+                    for lang, keys in user_trans.items():
+                        if lang in translations:
+                            translations[lang].update(keys)
+                        else:
+                            translations[lang] = keys
+            except Exception as e:
+                pass # If user file is bad, just use defaults
+        else:
+            # If missing, write defaults
+            try:
                 with open(trans_path, "w", encoding="utf-8") as f:
                     f.write(default_content)
-            except Exception as e:
-                # If we can't write, just use the memory one
-                pass
+            except: pass
 
-        # Try loading from user file
-        if path.exists(trans_path):
-             with open(trans_path, "r", encoding="utf-8") as f:
-                 return json.load(f)
-        
-        # Fallback to internal if file load failed or still missing
-        content = importlib.resources.files("txa_mediafire").joinpath("translations.json").read_text(encoding="utf-8")
-        return json.loads(content)
+        return translations
 
     except Exception as e:
         console.print(f"[bold red]Critical Error loading translations:[/bold red] {e}")
-        return {} # Should not happen if package is intact
+        return {}
 
 TRANSLATIONS = load_translations()
 T = TRANSLATIONS.get(LANG, TRANSLATIONS.get("en", {}))
