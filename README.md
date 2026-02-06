@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.png" width="200" alt="TXA-M Logo">
+  <img src="https://raw.githubusercontent.com/TXAVLOG/TXA-MEDIAFIRE/main/assets/logo.png" width="200" alt="TXA-M Logo">
 </p>
 
 # TXA MediaFire Bulk Downloader

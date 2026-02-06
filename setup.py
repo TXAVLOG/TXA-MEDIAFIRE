@@ -22,6 +22,11 @@ setup(
     description="A modern, high-speed downloader for MediaFire files and folders",
     long_description=open("README.md", encoding="utf-8").read() if open("README.md", encoding="utf-8") else "",
     long_description_content_type="text/markdown",
+    url="https://github.com/TXAVLOG/TXA-MEDIAFIRE",
+    project_urls={
+        "Bug Tracker": "https://github.com/TXAVLOG/TXA-MEDIAFIRE/issues",
+        "Source Code": "https://github.com/TXAVLOG/TXA-MEDIAFIRE",
+    },
     classifiers=[
         "Programming Language :: Python :: 3",
         "Operating System :: OS Independent",
