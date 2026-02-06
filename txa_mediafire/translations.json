@@ -37,7 +37,13 @@
         "updating": "Updating to version",
         "update_success": "Update successful! Please restart the tool.",
         "err_unrecognized_args": "Unrecognized arguments",
-        "err_missed_args": "the following arguments are required"
+        "err_missed_args": "the following arguments are required",
+        "history_title": "Download History",
+        "history_empty": "No download history found.",
+        "history_header_date": "Date",
+        "history_header_file": "Filename",
+        "history_header_size": "Size",
+        "update_notice": "Run 'txa-m -u' to update now."
     },
     "vi": {
         "banner_desc": "Trình tải xuống tốc độ cao, hiện đại cho MediaFire",
@@ -77,6 +83,12 @@
         "updating": "Đang cập nhật lên phiên bản",
         "update_success": "Cập nhật thành công! Vui lòng khởi động lại công cụ.",
         "err_unrecognized_args": "Tham số không được nhận diện",
-        "err_missed_args": "các tham số sau là bắt buộc"
+        "err_missed_args": "các tham số sau là bắt buộc",
+        "history_title": "Lịch sử tải xuống",
+        "history_empty": "Chưa có lịch sử tải xuống.",
+        "history_header_date": "Ngày tháng",
+        "history_header_file": "Tên tệp",
+        "history_header_size": "Dung lượng",
+        "update_notice": "Chạy lệnh 'txa-m -u' để cập nhật ngay."
     }
 }

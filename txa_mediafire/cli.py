@@ -41,7 +41,7 @@ from rich.theme import Theme
 from rich import box
 
 # --- Configuration ---
-APP_VERSION = "2.0.7"
+APP_VERSION = "2.1.0"
 
 # Default ignore lists
 IGNORE_EXTENSIONS = {".pyc", ".pyo", ".pyd", ".DS_Store", "Thumbs.db"}
@@ -97,6 +97,66 @@ def save_config(language):
     except Exception as e:
         console.print(f"[bold red]Error saving config:[/bold red] {e}")
         return False
+
+def get_history_path():
+    return path.join(path.dirname(get_config_path()), "history.txa")
+
+def xor_cipher(data: str) -> str:
+    key = "txamediafire"
+    return "".join(chr(ord(c) ^ ord(key[i % len(key)])) for i, c in enumerate(data))
+
+def save_to_history(filename, size_str):
+    history_path = get_history_path()
+    try:
+        data = []
+        if path.exists(history_path):
+            with open(history_path, "rb") as f:
+                enc_data = f.read()
+                try:
+                    decrypted = xor_cipher(base64.b64decode(enc_data).decode("utf-8"))
+                    data = json.loads(decrypted)
+                except: data = []
+        
+        entry = {
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "file": filename,
+            "size": size_str
+        }
+        data.append(entry)
+        
+        # Keep only last 100 entries for performance
+        data = data[-100:]
+        
+        json_str = json.dumps(data)
+        encrypted = base64.b64encode(xor_cipher(json_str).encode("utf-8"))
+        with open(history_path, "wb") as f:
+            f.write(encrypted)
+    except: pass
+
+def show_history():
+    history_path = get_history_path()
+    print_header()
+    table = Table(title=f"[bold cyan]{T['history_title']}[/bold cyan]", box=box.ROUNDED, expand=True)
+    table.add_column(T["history_header_date"], style="dim", width=20)
+    table.add_column(T["history_header_file"], style="green")
+    table.add_column(T["history_header_size"], justify="right", style="magenta", width=15)
+    
+    if not path.exists(history_path):
+        console.print(f"[italic yellow]{T['history_empty']}[/italic yellow]")
+        return
+
+    try:
+        with open(history_path, "rb") as f:
+            enc_data = f.read()
+            decrypted = xor_cipher(base64.b64decode(enc_data).decode("utf-8"))
+            data = json.loads(decrypted)
+            
+            for item in reversed(data): # Show latest first
+                table.add_row(item["date"], item["file"], item["size"])
+                
+        console.print(table)
+    except Exception as e:
+        console.print(f"[error]Error reading history:[/error] {e}")
 
 # Load global config
 CONFIG = load_config()
@@ -217,8 +277,9 @@ def check_update(silent=False):
     if latest_version != APP_VERSION:
         console.print(Panel(
             f"{T['update_available']}\n"
-            f"[bold red]v{APP_VERSION}[/bold red] -> [bold green]v{latest_version}[/bold green]\n"
-            f"[dim]Run 'txa-m --u' to upgrade[/dim]",
+            f"[bold red]v{APP_VERSION}[/bold red] -> [bold green]v{latest_version}[/bold green]\n\n"
+            f"[yellow]{T['update_notice']}[/yellow]\n"
+            f"[dim]Alternative: pip install --upgrade txa-m[/dim]",
             title="[bold magenta]UPDATE[/bold magenta]",
             border_style="magenta",
             expand=False
@@ -366,6 +427,7 @@ def show_help():
     opts_table.add_row('"-ie", "--ignore-extensions"', "Ignore specific extensions [dim](e.g. .mp4,.mkv)[/dim]")
     opts_table.add_row('"-in", "--ignore-names"', "Ignore specific filenames")
     opts_table.add_row('"--sl", "--set-lang"', "Set language [dim](en/vi)[/dim]")
+    opts_table.add_row('"-hi", "--history"', "Show download history [dim](encrypted)[/dim]")
     opts_table.add_row('"-u", "--update"', "Check and auto-update tool via pip")
     opts_table.add_row('"-v", "--version"', "Show version info")
     
@@ -395,6 +457,7 @@ def main():
     parser.add_argument("-in", "--ignore-names", help="Comma-separated list of filenames to ignore", default=None)
     parser.add_argument("-v", "--version", action="version", version=f"TXA MediaFire Bulk Downloader v{APP_VERSION} (c) TXA", help="Show version and copyright info")
     parser.add_argument("--sl", "--set-lang", choices=["en", "vi"], help="Set application language (en/vi)", dest="set_lang")
+    parser.add_argument("-hi", "--history", action="store_true", help="Show encrypted download history")
     parser.add_argument("-u", "--update", action="store_true", help="Check and auto-update tool via pip")
     parser.add_argument("-h", "--help", action="store_true", help="Show this help message")
     
@@ -403,6 +466,11 @@ def main():
     # Handle Help
     if args.help:
         show_help()
+        sys.exit(0)
+
+    # Handle History
+    if args.history:
+        show_history()
         sys.exit(0)
 
     # Handle Language Setting
@@ -727,6 +795,7 @@ def download_file_worker(file, output_dir, event, limiter, progress, update_cb):
 
         with stats.lock:
             stats.downloaded_files += 1
+            save_to_history(filename, format_size(file_size))
         update_cb()
 
     except Exception as e:
