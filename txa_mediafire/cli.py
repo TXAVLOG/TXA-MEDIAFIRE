@@ -41,7 +41,7 @@ from rich.theme import Theme
 from rich import box
 
 # --- Configuration ---
-APP_VERSION = "2.0.6"
+APP_VERSION = "2.0.7"
 
 # Default ignore lists
 IGNORE_EXTENSIONS = {".pyc", ".pyo", ".pyd", ".DS_Store", "Thumbs.db"}
