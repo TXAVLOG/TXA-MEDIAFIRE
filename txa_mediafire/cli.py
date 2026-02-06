@@ -2,8 +2,6 @@
 
 import base64
 import hashlib
-import http.client
-import urllib.parse
 import importlib.resources
 import json
 import platform
@@ -11,8 +9,6 @@ import subprocess
 import sys
 from re import findall, search
 from time import sleep
-from io import BytesIO
-from gzip import GzipFile
 from datetime import datetime
 from requests import get
 from gazpacho import Soup
@@ -21,7 +17,7 @@ from os import path, makedirs, remove, environ
 from threading import BoundedSemaphore, Thread, Event, Lock
 
 # --- Rich UI Imports ---
-from rich.console import Console
+from rich.console import Console, Group
 from rich.panel import Panel
 from rich.text import Text
 from rich.progress import (
@@ -41,7 +37,7 @@ from rich.theme import Theme
 from rich import box
 
 # --- Configuration ---
-APP_VERSION = "2.1.1"
+APP_VERSION = "2.1.2"
 
 # Default ignore lists
 IGNORE_EXTENSIONS = {".pyc", ".pyo", ".pyd", ".DS_Store", "Thumbs.db"}
@@ -568,7 +564,8 @@ def main():
     event = Event()
     limiter = BoundedSemaphore(args.threads)
     
-    progress = Progress(
+    # Progress for Bytes (Total + Individual)
+    p_bytes = Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
         BarColumn(bar_width=None),
@@ -579,23 +576,38 @@ def main():
         TransferSpeedColumn(),
         "•",
         TimeRemainingColumn(),
-        "•",
-        ClockColumn(),
         console=console,
         expand=True
     )
 
-    with progress:
-        overall_task: TaskID = progress.add_task(f"[bold info]{T['total_progress']}", total=stats.total_size)
-        file_count_task: TaskID = progress.add_task(f"[bold info]{T['files_count']} (0/{stats.total_files})", total=stats.total_files)
+    # Progress for File Counts
+    p_count = Progress(
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(bar_width=None),
+        "[progress.percentage]{task.percentage:>3.0f}%",
+        "•",
+        TextColumn("[bold blue]{task.completed}/{task.total}[/bold blue] " + T["files_count"].split()[0]),
+        console=console,
+        expand=True
+    )
+
+    ui_group = Group(
+        Panel(p_count, title=f"[bold cyan]{T['files_count']}", border_style="cyan"),
+        Panel(p_bytes, title=f"[bold magenta]{T['total_progress']}", border_style="magenta")
+    )
+
+    with Live(ui_group, console=console, refresh_per_second=10):
+        overall_task = p_bytes.add_task(f"[bold]{T['total_progress']}", total=stats.total_size)
+        file_count_task = p_count.add_task(f"[bold]{T['files_count']}", total=stats.total_files)
 
         def update_overall():
-            progress.update(overall_task, completed=stats.downloaded_bytes)
-            progress.update(file_count_task, completed=stats.downloaded_files, description=f"[bold info]{T['files_count']} ({stats.downloaded_files}/{stats.total_files})")
+            p_bytes.update(overall_task, completed=stats.downloaded_bytes)
+            p_count.update(file_count_task, completed=stats.downloaded_files, 
+                          description=f"[bold]{T['files_count']} ({stats.downloaded_files}/{stats.total_files})")
 
         threads = []
         for file_info, destination in all_tasks:
-            threads.append(Thread(target=download_file_worker, args=(file_info, destination, event, limiter, progress, update_overall)))
+            threads.append(Thread(target=download_file_worker, args=(file_info, destination, event, limiter, p_bytes, update_overall)))
 
         for t in threads:
             t.start()
@@ -698,7 +710,6 @@ def download_file_worker(file, output_dir, event, limiter, progress, update_cb):
 
     try:
         # We ensure dir exists in main loop, but recursive structures might need this
-        # Using output_dir which already includes subfolder path from discover_all_files
         makedirs(output_dir, exist_ok=True)
 
         if path.exists(file_path):
@@ -710,93 +721,89 @@ def download_file_worker(file, output_dir, event, limiter, progress, update_cb):
                     stats.downloaded_files += 1
                     stats.downloaded_bytes += file_size
                 update_cb()
-                limiter.release()
                 return
 
         if event.is_set():
-            limiter.release()
             return
 
         # Show task now that we know we might download it
         task_id = progress.add_task(f"[cyan]{filename}[/cyan]", total=file_size, visible=True)
 
         download_link = file["links"]["normal_download"]
-        parsed_url = urllib.parse.urlparse(download_link)
+        
+        # Step 1: Get the real download button/link
+        response = get(download_link, headers=HEADERS, timeout=60)
+        if response.status_code != 200:
+             progress.console.log(f"[error]{T['http_err']} {response.status_code} for {filename}[/error]")
+             with stats.lock: stats.failed += 1
+             if task_id is not None: progress.remove_task(task_id)
+             return
 
-        conn = http.client.HTTPConnection(parsed_url.netloc, timeout=60)
-        conn.request("GET", parsed_url.path, headers=HEADERS)
-        response = conn.getresponse()
+        html = response.text
+        soup = Soup(html)
+        download_btn = soup.find("a", {"id": "downloadButton"})
+        real_link = None
+        
+        if download_btn and download_btn.attrs.get("href"):
+            real_link = download_btn.attrs["href"]
+        
+        if not real_link and download_btn and download_btn.attrs.get("data-scrambled-url"):
+            try:
+                real_link = base64.b64decode(download_btn.attrs["data-scrambled-url"]).decode("utf-8")
+            except Exception: pass
+        
+        if not real_link:
+            # Fallback Strategy: Regex
+            match = search(r'href=[\"\'](https?://download[^\"\']+)[\"\']', html)
+            if match:
+                real_link = match.group(1)
 
-        if response.getheader("Content-Encoding") == "gzip":
-            compressed_data = response.read()
-            conn.close()
-            with GzipFile(fileobj=BytesIO(compressed_data)) as f:
-                html = f.read().decode("utf-8", errors="ignore")
-
-            soup = Soup(html)
-            download_btn = soup.find("a", {"id": "downloadButton"})
-            real_link = None
-            
-            if download_btn and download_btn.attrs.get("href"):
-                real_link = download_btn.attrs["href"]
-            
-            if not real_link and download_btn and download_btn.attrs.get("data-scrambled-url"):
-                try:
-                    real_link = base64.b64decode(download_btn.attrs["data-scrambled-url"]).decode("utf-8")
-                except Exception: pass
-            
-            if not real_link:
-                # Fallback Strategy: Regex
-                console.log(f"[dim]{T['try_fallback']}: {filename}[/dim]")
-                match = search(r'href=["\'](https?://download[^"\']+)["\']', html)
-                if match:
-                    real_link = match.group(1)
-
-            if not real_link:
-                progress.console.log(f"[error]{T['fail_link']} {filename}[/error]")
-                with stats.lock: stats.failed += 1
-                if task_id is not None: progress.remove_task(task_id)
-                limiter.release()
-                return
-
-            parsed_url = urllib.parse.urlparse(real_link)
-            conn = http.client.HTTPConnection(parsed_url.netloc, timeout=60)
-            conn.request("GET", parsed_url.path + ("?" + parsed_url.query if parsed_url.query else ""), headers=HEADERS)
-            response = conn.getresponse()
-
-        if 400 <= response.status < 600:
-            conn.close()
-            progress.console.log(f"[error]{T['http_err']} {response.status} for {filename}[/error]")
+        if not real_link:
+            progress.console.log(f"[error]{T['fail_link']} {filename}[/error]")
             with stats.lock: stats.failed += 1
             if task_id is not None: progress.remove_task(task_id)
-            limiter.release()
             return
-        
-        with open(file_path, "wb") as f:
-            while not event.is_set():
-                chunk = response.read(65536)
-                if not chunk:
-                    break
-                f.write(chunk)
-                with stats.lock:
-                    stats.downloaded_bytes += len(chunk)
-                progress.update(task_id, advance=len(chunk))
-                update_cb()
 
-        conn.close()
+        # Step 2: Download the actual file
+        res = get(real_link, headers=HEADERS, stream=True, timeout=60)
+        if res.status_code != 200:
+             progress.console.log(f"[error]{T['http_err']} {res.status_code} for {filename}[/error]")
+             with stats.lock: stats.failed += 1
+             if task_id is not None: progress.remove_task(task_id)
+             return
+
+        downloaded_for_this_file = 0
+        with open(file_path, "wb") as f:
+            for chunk in res.iter_content(chunk_size=65536):
+                if event.is_set():
+                    break
+                if chunk:
+                    f.write(chunk)
+                    chunk_len = len(chunk)
+                    downloaded_for_this_file += chunk_len
+                    with stats.lock:
+                        stats.downloaded_bytes += chunk_len
+                    progress.update(task_id, advance=chunk_len)
+                    update_cb()
+
         # Remove task when done to keep the list clean
         if task_id is not None: 
             progress.remove_task(task_id)
 
         if event.is_set():
             if path.exists(file_path): remove(file_path)
-            limiter.release()
             return
 
-        with stats.lock:
-            stats.downloaded_files += 1
-            save_to_history(filename, format_size(file_size))
-        update_cb()
+        # Verify if we actually got data
+        if downloaded_for_this_file > 0:
+            with stats.lock:
+                stats.downloaded_files += 1
+                save_to_history(filename, format_size(file_size))
+            update_cb()
+        else:
+            progress.console.log(f"[error]{T['err_download']} {filename}: 0 bytes received[/error]")
+            with stats.lock: stats.failed += 1
+            if path.exists(file_path): remove(file_path)
 
     except Exception as e:
         console.log(f"[error]{T['err_download']} {filename}:[/error] {e}")
