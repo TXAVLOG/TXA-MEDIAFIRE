@@ -41,7 +41,7 @@ from rich.theme import Theme
 from rich import box
 
 # --- Configuration ---
-APP_VERSION = "2.1.0"
+APP_VERSION = "2.1.1"
 
 # Default ignore lists
 IGNORE_EXTENSIONS = {".pyc", ".pyo", ".pyd", ".DS_Store", "Thumbs.db"}
@@ -279,7 +279,7 @@ def check_update(silent=False):
             f"{T['update_available']}\n"
             f"[bold red]v{APP_VERSION}[/bold red] -> [bold green]v{latest_version}[/bold green]\n\n"
             f"[yellow]{T['update_notice']}[/yellow]\n"
-            f"[dim]Alternative: pip install --upgrade txa-m[/dim]",
+            f"[dim]Alternative: pip install txa-m=={latest_version}[/dim]",
             title="[bold magenta]UPDATE[/bold magenta]",
             border_style="magenta",
             expand=False
