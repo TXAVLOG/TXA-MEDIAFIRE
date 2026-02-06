@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="txa-m",
-    version="2.1.2",
+    version="2.1.3",
     packages=find_packages(),
     install_requires=[
         "requests",
@@ -19,6 +19,8 @@ setup(
         ],
     },
     author="TXA",
+    author_email="viptretrauc@gmail.com",
+    license="MIT",
     description="A modern, high-speed downloader for MediaFire files and folders",
     long_description=open("README.md", encoding="utf-8").read() if open("README.md", encoding="utf-8") else "",
     long_description_content_type="text/markdown",
