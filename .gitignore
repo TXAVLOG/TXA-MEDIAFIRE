@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
+*.log
 .Python
 env/
 build/
@@ -19,9 +20,6 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-
-# Logs
-*.log
 
 # Environments
 .env
