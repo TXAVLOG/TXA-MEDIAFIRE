@@ -37,7 +37,7 @@ from rich.theme import Theme
 from rich import box
 
 # --- Configuration ---
-APP_VERSION = "2.2.0"
+APP_VERSION = "2.2.1"
 
 # Default ignore lists
 IGNORE_EXTENSIONS = {".pyc", ".pyo", ".pyd", ".DS_Store", "Thumbs.db"}
@@ -304,6 +304,7 @@ def perform_update():
              
         cmd = [sys.executable, "-m", "pip", "install", "--upgrade", "txa-m"]
         
+        is_updated = False
         with console.status(f"[bold info]{T['updating']} {latest}...[/bold info]", spinner="dots") as status:
             process = subprocess.Popen(
                 cmd, 
@@ -322,6 +323,10 @@ def perform_update():
                     line = line.strip()
                     if not line: continue
                     
+                    # Track success status
+                    if "successfully installed" in line.lower():
+                        is_updated = True
+                    
                     # Filter output for cleaner log
                     if "Requirement already satisfied" in line:
                          status.update(f"[dim]{line}[/dim]")
@@ -334,14 +339,17 @@ def perform_update():
                          status.update(f"[dim]{line}[/dim]")
         
         if process.returncode == 0:
-            console.print(f"[bold success]{T['update_success']}[/bold success]")
-            sys.exit(0)
+            if is_updated:
+                console.print(f"[bold success]{T['update_success']}[/bold success]")
+                sys.exit(0)
+            else:
+                console.print(f"[bold warning]{T['no_update']}[/bold warning] (pip reported no changes)")
         else:
             console.print(f"[bold red]Update failed with code {process.returncode}[/bold red]")
             sys.exit(1)
 
     except Exception as e:
-        console.print(f"[bold red]An error occurred:[/bold red] {e}")
+        console.print(f"[bold red]An error occurred during update:[/bold red] {e}")
         sys.exit(1)
 
 # --- Custom Parser ---
