@@ -37,7 +37,7 @@ from rich.theme import Theme
 from rich import box
 
 # --- Configuration ---
-APP_VERSION = "2.2.1"
+APP_VERSION = "2.2.2"
 
 # Default ignore lists
 IGNORE_EXTENSIONS = {".pyc", ".pyo", ".pyd", ".DS_Store", "Thumbs.db"}
@@ -302,7 +302,7 @@ def perform_update():
              console.print(f"[bold green]{T['no_update']}[/bold green]")
              return
              
-        cmd = [sys.executable, "-m", "pip", "install", "--upgrade", "txa-m"]
+        cmd = [sys.executable, "-m", "pip", "install", "--upgrade", f"txa-m=={latest}"]
         
         is_updated = False
         with console.status(f"[bold info]{T['updating']} {latest}...[/bold info]", spinner="dots") as status:

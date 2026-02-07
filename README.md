@@ -106,7 +106,23 @@ txa-m --u
     txa-m "LINK" -o "/sdcard/Download"
     ```
 
-## 📜 Copyright
+## 📜 Changelog
+
+### v2.2.2
+*   **Documentation**: Added Changelog section for PyPI tracking.
+
+### v2.2.1
+*   **Bug Fix**: Improved update logic to detect actual pip installation success.
+*   **Aesthetics**: Slight UI refinements in help menu.
+
+### v2.2.0
+*   **New Feature**: **Smart Output** - Auto-save to current directory for files, or `TXAM-F` for folders when `-o` is omitted.
+*   **Dev**: Added `build` and `twine` to requirements for easier publishing.
+
+### v2.1.4
+*   Initial stable release with multi-language support and rich UI.
+
+## ⚖️ License & Copyright
 
 Copyright © 2026 TXA.
-_This tool is for educational purposes only._
+_This tool is for educational purposes only. Development driven by TXA VLOG._
