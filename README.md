@@ -40,12 +40,25 @@ Run the tool using the command `txa-m`.
 txa-m "https://www.mediafire.com/file/example.zip"
 ```
 
-### 2. Download Folder to Specific Path
+### 2. Smart Output (Default)
+If you don't provide an output path with `-o`, the tool uses smart defaults:
+*   **Single File**: Saves directly to your current directory.
+*   **Folder Link**: Automatically creates a `TXAM-F` folder in your current directory.
+
+```bash
+# Saves to current directory
+txa-m "https://www.mediafire.com/file/example.zip"
+
+# Creates TXAM-F/ and saves contents there
+txa-m "https://www.mediafire.com/folder/example"
+```
+
+### 3. Download Folder to Specific Path
 ```bash
 txa-m "https://www.mediafire.com/folder/example" -o "C:/MyDownloads"
 ```
 
-### 3. Change Language 🇻🇳 / 🇺🇸
+### 4. Change Language 🇻🇳 / 🇺🇸
 Switch between English and Vietnamese easily. The setting is saved globally.
 ```bash
 # Switch to Vietnamese
@@ -55,7 +68,7 @@ txa-m --sl vi
 txa-m --sl en
 ```
 
-### 4. Advanced Options
+### 5. Advanced Options
 ```bash
 # 20 threads, ignore video files
 txa-m "https://mediafire.com/..." -t 20 -ie ".mp4,.mkv"

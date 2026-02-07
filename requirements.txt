@@ -1,6 +1,9 @@
+requests==2.31.0
+gazpacho==1.1
+rich==13.7.1
+build==1.4.0
+twine==5.0.0
 certifi==2024.2.2
 charset-normalizer==3.3.2
-gazpacho==1.1
 idna==3.6
-requests==2.31.0
 urllib3==2.2.1

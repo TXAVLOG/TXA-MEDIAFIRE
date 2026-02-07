@@ -13,7 +13,7 @@ from datetime import datetime
 from requests import get
 from gazpacho import Soup
 from argparse import ArgumentParser
-from os import path, makedirs, remove, environ
+from os import path, makedirs, remove, environ, getcwd
 from threading import BoundedSemaphore, Thread, Event, Lock
 
 # --- Rich UI Imports ---
@@ -37,7 +37,7 @@ from rich.theme import Theme
 from rich import box
 
 # --- Configuration ---
-APP_VERSION = "2.1.4"
+APP_VERSION = "2.2.0"
 
 # Default ignore lists
 IGNORE_EXTENSIONS = {".pyc", ".pyo", ".pyd", ".DS_Store", "Thumbs.db"}
@@ -425,7 +425,7 @@ def show_help():
     opts_table.add_column("Description", style="white")
     
     opts_table.add_row('"-h", "--help"', "Show this help message")
-    opts_table.add_row('"-o", "--output"', 'Output directory [dim](supports env vars)[/dim]')
+    opts_table.add_row('"-o", "--output"', 'Output directory [dim](optional, supports env vars)[/dim]')
     opts_table.add_row('"-t", "--threads"', "Number of threads [dim](default: 10)[/dim]")
     opts_table.add_row('"-ie", "--ignore-extensions"', "Ignore specific extensions [dim](e.g. .mp4,.mkv)[/dim]")
     opts_table.add_row('"-in", "--ignore-names"', "Ignore specific filenames")
@@ -436,8 +436,16 @@ def show_help():
     
     console.print(opts_table)
     
+    console.print("\n[bold underline]SMART OUTPUT (no -o):[/bold underline]")
+    console.print('  [dim]• Single file:[/dim] Saves to [cyan]current directory[/cyan]')
+    console.print('  [dim]• Folder link:[/dim] Creates [cyan]TXAM-F[/cyan] folder in current directory')
+    
     console.print("\n[bold underline]EXAMPLES:[/bold underline]")
-    console.print('  [dim]# Download a folder to Desktop[/dim]')
+    console.print('  [dim]# Download a single file to current directory (no -o needed)[/dim]')
+    console.print('  txa-m [green]"https://mediafire.com/file/abc123/..."[/green]')
+    console.print('\n  [dim]# Download a folder (auto-creates TXAM-F folder)[/dim]')
+    console.print('  txa-m [green]"https://mediafire.com/folder/xyz789/..."[/green]')
+    console.print('\n  [dim]# Download a folder to specific location[/dim]')
     console.print('  txa-m [green]"https://mediafire.com/..."[/green] -o [yellow]"%USERPROFILE%/Desktop"[/yellow]')
     console.print('\n  [dim]# Download with 20 threads, ignoring .mp4 files[/dim]')
     console.print('  txa-m [green]"https://mediafire.com/..."[/green] -t 20 -ie .mp4')
@@ -454,7 +462,7 @@ def main():
     
     # Make mediafire_url optional so we can run just --set-lang or --help
     parser.add_argument("mediafire_url", nargs="?", help='The URL of the file or folder (MUST be wrapped in quotes)')
-    parser.add_argument("-o", "--output", help='Output folder (supports env vars, MUST be wrapped in quotes)', default=".")
+    parser.add_argument("-o", "--output", help='Output folder (supports env vars, MUST be wrapped in quotes)', default=None)
     parser.add_argument("-t", "--threads", help="Number of threads", type=int, default=10)
     parser.add_argument("-ie", "--ignore-extensions", help="Comma-separated list of extensions to ignore (e.g. .mp4,.mkv)", default=None)
     parser.add_argument("-in", "--ignore-names", help="Comma-separated list of filenames to ignore", default=None)
@@ -527,9 +535,23 @@ def main():
     t_type, key = folder_or_file[0]
 
     # Process Output Directory
-    output_dir = path.expandvars(args.output)
-    output_dir = path.expanduser(output_dir)
-    output_dir = path.abspath(output_dir)
+    # If -o is not provided, use smart defaults:
+    # - For single file: save to current working directory
+    # - For folder: create TXAM-F folder in current working directory
+    if args.output is None:
+        # No -o provided, use current working directory as base
+        base_dir = getcwd()
+        if t_type == "folder":
+            # For folder links, create TXAM-F folder
+            output_dir = path.join(base_dir, "TXAM-F")
+        else:
+            # For file/file_premium links, save directly to cwd
+            output_dir = base_dir
+    else:
+        # -o was provided, use it as-is
+        output_dir = path.expandvars(args.output)
+        output_dir = path.expanduser(output_dir)
+        output_dir = path.abspath(output_dir)
 
     # Ensure output directory exists before showing banner to confirm we can write
     try:
